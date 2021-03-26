@@ -1,0 +1,25 @@
+3 !! iflow
+200                         !! iproc
+20                          !! iparallel
+120                         !! iwait
+-5.E4 !! k2_val
+5000                        !! N_traj
+0.5d-15                     !! dt (*hbar/kT)
+1.d-12                      !! tim_eq (*hbar/kT)
+100.d-12                    !! total_time (*hbar/kT)
+0                           !! iwrite: 1 - writes output_cl,output_qm
+1                           !! nstep_write
+20                          !! nstep_avg
+1                           !! idistribution - 1-classical, 0-Wigner
+0                           !! flag_frust - 0: reverse velocity, 1 - do nothing
+0.05d0                      !! energy_cutoff (cm-1)
+2                           !! nclass
+3                           !! nquant
+31                          !! nbasis
+1.d0                        !! gamma_B (hbar*omg)
+300.d0                      !! temperature (K)
+1                           !! iforward: 1- left to right, 0 - right to left
+1                           !! icollapse: 1 - A-FSSH, 0 - FSSH
+1                           !! ifriction: 1 - random forces
+1729 3141                   !! seed
+x
