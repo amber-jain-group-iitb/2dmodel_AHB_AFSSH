@@ -1,5 +1,4 @@
 Module mod_afssh
-use matmul_lapack
 !! Hammes-Schiffer, Tully, JCP 101, 4657 (1994)
 implicit none
 real*8, parameter :: clight=2.99792458D10,av=6.0221367D23,hbar=1.05457266D-34
@@ -189,6 +188,7 @@ subroutine main
 
   call setup_parameters
   call initialize_averages
+  !call draw_pes
 
   do i=1,N_traj
     traj_num=i
@@ -600,18 +600,18 @@ subroutine rk4(ci,dtq,dVk_dt)
   real*8,intent(in) :: dtq,dVk_dt(nquant)
   complex*16,dimension(1:nquant):: k1,k2,k3,k4
 
-  k1=matmul_lap(mat_adiab,ci)
+  k1=matmul(mat_adiab,ci)
 
   V_k=V_k+dVk_dt*dtq/2.d0
   call compute_mat_adiab
 
-  k2=matmul_lap(mat_adiab,ci+0.5*dtq*k1)
-  k3=matmul_lap(mat_adiab,ci+0.5*dtq*k2)
+  k2=matmul(mat_adiab,ci+0.5*dtq*k1)
+  k3=matmul(mat_adiab,ci+0.5*dtq*k2)
 
   V_k=V_k+dVk_dt*dtq/2.d0
   call compute_mat_adiab
 
-  k4=matmul_lap(mat_adiab,ci+dtq*k3)
+  k4=matmul(mat_adiab,ci+dtq*k3)
 
   ci=ci+dtq/6.d0*(k1+2*k2+2*k3+k4)
 
@@ -679,18 +679,18 @@ subroutine evolve_quantum_adiabatic
   implicit none
   complex*16,dimension(1:nquant):: k1,k2,k3,k4
 
-  k1=matmul_lap(mat_adiab,ci)
+  k1=matmul(mat_adiab,ci)
 
   call evolve_classical(dtc/2.d0)
   call compute_mat_adiab
 
-  k2=matmul_lap(mat_adiab,ci+0.5*dtc*k1)
-  k3=matmul_lap(mat_adiab,ci+0.5*dtc*k2)
+  k2=matmul(mat_adiab,ci+0.5*dtc*k1)
+  k3=matmul(mat_adiab,ci+0.5*dtc*k2)
 
   call evolve_classical(dtc/2.d0)
   call compute_mat_adiab
 
-  k4=matmul_lap(mat_adiab,ci+dtc*k3)
+  k4=matmul(mat_adiab,ci+dtc*k3)
 
   ci=ci+dtc/6.d0*(k1+2*k2+2*k3+k4)
 
@@ -1094,7 +1094,7 @@ subroutine tise
   enddo
 
   do i=1,nclass
-    delH_dels_ad(state,state,i)=sum(si_adiab(:,state)*matmul_lap(delH_dels(:,:,i),si_adiab(:,state)))
+    delH_dels_ad(state,state,i)=sum(si_adiab(:,state)*matmul(delH_dels(:,:,i),si_adiab(:,state)))
   enddo
   !call cpu_time(t2);tim_diag=tim_diag+(t2-t1)
 
@@ -1120,7 +1120,7 @@ subroutine compute_delH_dels_ad
   force=0.d0
   do k=1,nquant
     do i=1,nclass
-      delH_dels_ad(k,k,i)=sum(si_adiab(:,k)*matmul_lap(delH_dels(:,:,i),si_adiab(:,k)))
+      delH_dels_ad(k,k,i)=sum(si_adiab(:,k)*matmul(delH_dels(:,:,i),si_adiab(:,k)))
     enddo
     force(k,:)=-delH_dels_ad(k,k,:)
   enddo
@@ -1135,7 +1135,7 @@ subroutine compute_dij
   do k=1,nquant-1
     do kp=k+1,nquant
       do i=1,nclass
-        d_ij(k,kp,i)=sum(si_adiab(:,k)*matmul_lap(delH_dels(:,:,i),si_adiab(:,kp)))
+        d_ij(k,kp,i)=sum(si_adiab(:,k)*matmul(delH_dels(:,:,i),si_adiab(:,kp)))
       enddo
       d_ij(k,kp,:)=d_ij(k,kp,:)/(V_k(kp)-V_k(k))
       d_ij(kp,k,:)=-d_ij(k,kp,:)
@@ -1158,7 +1158,7 @@ subroutine compute_dij_2state(x_hop,k,kp,dp)
   call evaluate_variables(0)
 
   do i=1,nclass
-    dp(i)=sum(si_adiab(:,k)*matmul_lap(delH_dels(:,:,i),si_adiab(:,kp)))
+    dp(i)=sum(si_adiab(:,k)*matmul(delH_dels(:,:,i),si_adiab(:,kp)))
   enddo
   dp=dp/(V_k(kp)-V_k(k))
 
@@ -1231,9 +1231,9 @@ subroutine orthoganalize(mat,n)
   real*8,intent(inout)::mat(n,n)
   real*8 S_mat(n,n)
 
-  S_mat=matmul_lap(transpose(mat),mat)
+  S_mat=matmul(transpose(mat),mat)
   call inverse_squareroot(S_mat,n)
-  mat=matmul_lap(mat,S_mat)
+  mat=matmul(mat,S_mat)
 
 end subroutine orthoganalize
 !-----------------------------------------------------------------  
@@ -1282,6 +1282,8 @@ subroutine setup_parameters
   r_cutoff=dabs(0.5*sum(si_diab(:,1)**2*r_grid))
 
   gamma_B=gamma_B*omg(1)
+
+write(6,*) k_coup(2)/wave_to_J/1.d30,r_cutoff*1.d10
 
 end subroutine setup_parameters
 !-----------------------------------------------------------------  
@@ -1431,7 +1433,7 @@ function commute(A,B,iflag)
   complex*16 tmp
   integer j,k
 
-  if(iflag==0) commute=matmul_lap(A,B)-matmul_lap(B,A)
+  if(iflag==0) commute=matmul(A,B)-matmul(B,A)
 
   if(iflag==1) then
     !! Assume A is diagonal
@@ -1466,7 +1468,7 @@ function anti_commute(A,B,iflag)
   real*8 delA(nquant,nquant)
   integer i,j
 
-  if(iflag==0) anti_commute=matmul_lap(A,B)+matmul_lap(B,A)
+  if(iflag==0) anti_commute=matmul(A,B)+matmul(B,A)
 
   if(iflag==1) then
     !! Assume A is diagonal
@@ -1484,34 +1486,49 @@ subroutine draw_pes
   implicit none
   integer i,j,n
   real*8 H(2,2),dH(2,2)
-  real*8 del
+  real*8 del,dd
+  real*8 vm
 
   state=1
+  vm=0.d0
   open(10,file="pes.out")
-  do i=1,20
-    x(1)=-0.5d-10+1.0d-10*i/20.d0
-    do j=1,20
-      x(2)=-0.1d-10+0.6d-10*j/20.d0
+  open(11,file="dij.out")
+  do i=1,50
+    x(1)=-0.5d-10+1.0d-10*i/50.d0
+    do j=1,50
+      x(2)=-0.1d-10+0.6d-10*j/50.d0
       !call compute_potential(H,dH)
       call evaluate_variables(0)
-      write(10,'(4f19.7)')x*1.d10,V_k/wave_to_J
+      call compute_dij
+      write(10,'(4f19.7)')x*1.d10,V_k(1:2)/wave_to_J
+      write(11,'(4f19.7)')x*1.d10,dsqrt(sum(d_ij(1,2,:)*d_ij(1,2,:)))/1.d10
+      if(x(1)<0.d0.and.V_k(1)<vm)vm=V_k(1)
     enddo
     write(10,'(4f15.7)')
+    write(11,'(4f15.7)')
   enddo
   close(10)
+  close(11)
 
-  stop
+  x(2)=0.18d-10
+  n=1000
+  do j=1,n
+    x(1)=-0.5d-10+1.d-10*(j-1)/real(n-1)
+    call evaluate_variables(0)
+    write(20,'(9es15.7)')x(1)*1.d10,V_k/wave_to_J!,dabs(d_ij(1,2,1:2)/1.d10)
+  enddo
 
   x(1)=0.d0
-  n=50
+  n=1000
   do j=1,n
-    x(2)=-0.5d-10+0.8d-10*(j-1)/real(n-1)
+    x(2)=-0.1d-10+0.6d-10*(j-1)/real(n-1)
     call evaluate_variables(0)
-    !call draw_wavefn
-    write(20,'(5es15.7)')x(2)*1.d10,(V_k(2)-V_k(1))/wave_to_J,dabs(d_ij(1,2,1:2)/1.d10)
-    del= V_k(2)-V_k(1)
-write(21,'(4es15.7)')x(2)*1.d10,dsqrt(pi*kb*temperature/(2*mass(1)))*dabs(pi*del/(hbar*d_ij(1,2,1))),dexp(-V_k(1)/(kb*temperature))
+    call compute_dij
+    write(21,'(9f15.7)')x(2)*1.d10,dabs(d_ij(1,2,1:2)/1.d10),(V_k(2)-V_k(1))/wave_to_J
+    write(22,'(9f15.7)')x(2)*1.d10,V_k(1:2)/wave_to_J
   enddo
+write(6,*) vm/wave_to_J
+
 
   stop
 
@@ -1665,7 +1682,7 @@ subroutine logm(mat,log_mat,n)
     dd(i,i)=cdlog(t(i,i)/cdabs(t(i,i)))
   enddo
 
-  log_mat=matmul_lap(vect,matmul_lap(dd,conjg(transpose(vect))))
+  log_mat=matmul(vect,matmul(dd,conjg(transpose(vect))))
 
 end subroutine logm
 !-----------------------------------------------------------------  
@@ -1686,7 +1703,7 @@ subroutine inverse_squareroot(mat,n)
     dd(i,i)=1.d0/t(i,i)**0.5d0
   enddo
 
-  mat=matmul_lap(vect,matmul_lap(dd,conjg(transpose(vect))))
+  mat=matmul(vect,matmul(dd,conjg(transpose(vect))))
 
 end subroutine inverse_squareroot
 !-----------------------------------------------------------------  
@@ -1789,5 +1806,48 @@ REAL FUNCTION determinant(matrix, n)
     
 END FUNCTION determinant
 !-----------------------------------------------------------------  
+
+subroutine gaussian_random_number(rnd)
+  !! generates gaussian distribution with center 0, sigma 1
+  !! q0+sig*rnd gives center=q0, sigma=sig
+  implicit none
+  real*8,intent(out)::rnd
+  real*8 rnd1,rnd2,pi
+
+  pi=dacos(-1.d0)
+
+  call random_number(rnd1)
+  call random_number(rnd2)
+  rnd = dsqrt(-2*log(rnd1))*dcos(2*pi*rnd2)
+
+end subroutine gaussian_random_number
+!---------------------------------------------------------- 
+
+subroutine compute_KE_matrix_dvr(KE_matrix,ngrid,delq,mass)
+  !! computes KE matrix in DVR basis
+  !! Appendix A of JCP 96, 1982 (1991)
+  implicit none
+  integer,intent(in) :: ngrid       !! size of DVR grid
+  real*8,intent(inout) :: KE_matrix(ngrid,ngrid)
+  real*8,intent(in) :: delq         !! step size in position of DVR basis
+  real*8,intent(in) :: mass         !! mass
+  integer i,j
+  real*8 pi,hbar
+
+  pi=dacos(-1.d0);hbar=1.05457266D-34
+
+  KE_matrix=hbar**2/(2*mass*delq**2)
+  do i=1,ngrid
+    do j=1,ngrid
+      KE_matrix(i,j)=KE_matrix(i,j)*(-1.d0)**(i-j)
+      if(i==j) then
+        KE_matrix(i,j)=KE_matrix(i,j)*pi**2/3.d0
+      else
+        KE_matrix(i,j)=KE_matrix(i,j)*2.d0/real(i-j)**2
+      endif
+    enddo
+  enddo
+end subroutine compute_KE_matrix_dvr
+!---------------------------------------------------------- 
 
 End Module mod_afssh
